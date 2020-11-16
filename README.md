@@ -28,7 +28,7 @@ keras==2.1.5
 
 ### 文件下载 
 训练所需的centernet_resnet50_voc.h5、centernet_hourglass_coco.h5可在百度网盘中下载。    
-链接: https://pan.baidu.com/s/1FF79PmRc8BzZk8M_ARdMmw 提取码: dc2j    
+链接: https://pan.baidu.com/s/1Tl56NmZVYljA2jHmOx5zOg 提取码: ukm3    
 centernet_resnet50_voc.h5是voc数据集的权重。    
 centernet_hourglass_coco.h5是coco数据集的权重。    
 
