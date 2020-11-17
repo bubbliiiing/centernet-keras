@@ -27,7 +27,7 @@ class CenterNet(object):
         # "model_path"        : 'model_data/centernet_hourglass_coco.h5',
         # "classes_path"      : 'model_data/coco_classes.txt',
         "backbone"          : 'resnet50',
-        "input_shape"  : [512,512,3],
+        "input_shape"       : [512,512,3],
         "confidence"        : 0.3,
         # backbone为resnet50时建议设置为True
         # backbone为hourglass时建议设置为False
