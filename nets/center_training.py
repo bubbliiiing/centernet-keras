@@ -211,6 +211,8 @@ class Generator(object):
                         # 表示第ct_int[1]行的第ct_int[0]个。
                         batch_indices[b, i] = ct_int[1] * self.output_size[0] + ct_int[0]
 
+                # 将RGB转化成BGR
+                img = np.array(img,dtype = np.float32)[:,:,::-1]
                 batch_images[b] = preprocess_image(img)
                 b = b + 1
                 if b == self.batch_size:
