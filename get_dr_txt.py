@@ -30,11 +30,12 @@ class mAP_CenterNet(CenterNet):
         self.nms_threhold = 0.5
 
         image_shape = np.array(np.shape(image)[0:2])
-        crop_img = letterbox_image(image, [self.model_image_size[0],self.model_image_size[1]])
-        photo = np.array(crop_img,dtype = np.float32)
+        crop_img = letterbox_image(image, [self.input_shape[0],self.input_shape[1]])
+        # 将RGB转化成BGR，这是因为原始的centernet_hourglass权值是使用BGR通道的图片训练的
+        photo = np.array(crop_img,dtype = np.float32)[:,:,::-1]
 
         # 图片预处理，归一化
-        photo = np.reshape(preprocess_image(photo),[1,self.model_image_size[0],self.model_image_size[1],self.model_image_size[2]])
+        photo = np.reshape(preprocess_image(photo),[1,self.input_shape[0],self.input_shape[1],self.input_shape[2]])
         preds = self.centernet.predict(photo)
         
         if self.nms:
@@ -43,7 +44,7 @@ class mAP_CenterNet(CenterNet):
         if len(preds[0])<=0:
             return image
 
-        preds[0][:,0:4] = preds[0][:,0:4]/(self.model_image_size[0]/4)
+        preds[0][:,0:4] = preds[0][:,0:4]/(self.input_shape[0]/4)
         
         # 筛选出其中得分高于confidence的框
         det_label = preds[0][:, -1]
@@ -56,7 +57,7 @@ class mAP_CenterNet(CenterNet):
         top_xmin, top_ymin, top_xmax, top_ymax = np.expand_dims(det_xmin[top_indices],-1),np.expand_dims(det_ymin[top_indices],-1),np.expand_dims(det_xmax[top_indices],-1),np.expand_dims(det_ymax[top_indices],-1)
         
         # 去掉灰条
-        boxes = centernet_correct_boxes(top_ymin,top_xmin,top_ymax,top_xmax,np.array([self.model_image_size[0],self.model_image_size[1]]),image_shape)
+        boxes = centernet_correct_boxes(top_ymin,top_xmin,top_ymax,top_xmax,np.array([self.input_shape[0],self.input_shape[1]]),image_shape)
 
         for i, c in enumerate(top_label_indices):
             predicted_class = self.class_names[int(c)]
