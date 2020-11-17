@@ -27,10 +27,11 @@ class CenterNet(object):
         # "model_path"        : 'model_data/centernet_hourglass_coco.h5',
         # "classes_path"      : 'model_data/coco_classes.txt',
         "backbone"          : 'resnet50',
-        "model_image_size"  : [512,512,3],
+        "input_shape"  : [512,512,3],
         "confidence"        : 0.3,
         # backbone为resnet50时建议设置为True
         # backbone为hourglass时建议设置为False
+        # 也可以根据检测效果自行选择
         "nms"               : True,
         "nms_threhold"      : 0.3,
     }
@@ -70,8 +71,9 @@ class CenterNet(object):
         # 计算总的种类
         self.num_classes = len(self.class_names)
 
-        self.centernet = centernet(self.model_image_size,num_classes=self.num_classes,backbone=self.backbone,mode='predict')
+        self.centernet = centernet(self.input_shape,num_classes=self.num_classes,backbone=self.backbone,mode='predict')
         self.centernet.load_weights(self.model_path,by_name=True)
+        
         print('{} model, anchors, and classes loaded.'.format(self.model_path))
 
         # 画框设置不同的颜色
@@ -88,13 +90,13 @@ class CenterNet(object):
     def detect_image(self, image):
         image_shape = np.array(np.shape(image)[0:2])
         
-        crop_img = letterbox_image(image, [self.model_image_size[0],self.model_image_size[1]])
-        photo = np.array(crop_img,dtype = np.float32)
+        crop_img = letterbox_image(image, [self.input_shape[0],self.input_shape[1]])
+        # 将RGB转化成BGR，这是因为原始的centernet_hourglass权值是使用BGR通道的图片训练的
+        photo = np.array(crop_img,dtype = np.float32)[:,:,::-1]
 
         # 图片预处理，归一化
-        photo = np.reshape(preprocess_image(photo),[1,self.model_image_size[0],self.model_image_size[1],self.model_image_size[2]])
+        photo = np.reshape(preprocess_image(photo),[1,self.input_shape[0],self.input_shape[1],self.input_shape[2]])
         preds = self.centernet.predict(photo)
-        
         #-------------------------------------------------------#
         #   对于centernet网络来讲，确立中心非常重要。
         #   对于大目标而言，会存在许多的局部信息。
@@ -109,7 +111,7 @@ class CenterNet(object):
         if len(preds[0])<=0:
             return image
 
-        preds[0][:,0:4] = preds[0][:,0:4]/(self.model_image_size[0]/4)
+        preds[0][:,0:4] = preds[0][:,0:4]/(self.input_shape[0]/4)
         
         # 筛选出其中得分高于confidence的框
         det_label = preds[0][:, -1]
@@ -122,11 +124,11 @@ class CenterNet(object):
         top_xmin, top_ymin, top_xmax, top_ymax = np.expand_dims(det_xmin[top_indices],-1),np.expand_dims(det_ymin[top_indices],-1),np.expand_dims(det_xmax[top_indices],-1),np.expand_dims(det_ymax[top_indices],-1)
         
         # 去掉灰条
-        boxes = centernet_correct_boxes(top_ymin,top_xmin,top_ymax,top_xmax,np.array([self.model_image_size[0],self.model_image_size[1]]),image_shape)
+        boxes = centernet_correct_boxes(top_ymin,top_xmin,top_ymax,top_xmax,np.array([self.input_shape[0],self.input_shape[1]]),image_shape)
 
         font = ImageFont.truetype(font='model_data/simhei.ttf',size=np.floor(3e-2 * np.shape(image)[1] + 0.5).astype('int32'))
 
-        thickness = (np.shape(image)[0] + np.shape(image)[1]) // self.model_image_size[0]
+        thickness = (np.shape(image)[0] + np.shape(image)[1]) // self.input_shape[0]
 
         for i, c in enumerate(top_label_indices):
             predicted_class = self.class_names[int(c)]
