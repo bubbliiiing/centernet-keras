@@ -1,10 +1,11 @@
-from keras.models import Model
-from keras.layers import Conv2D, Input, Activation, BatchNormalization, Add, UpSampling2D, ZeroPadding2D, Concatenate
-from keras.utils import get_file
-from keras.regularizers import l2
 import keras.backend as K
 import numpy as np
+from keras.layers import (Activation, Add, BatchNormalization, Concatenate,
+                          Conv2D, Input, UpSampling2D, ZeroPadding2D)
 from keras.models import Model
+from keras.regularizers import l2
+from keras.utils import get_file
+
 
 def conv2d(x, k, out_dim, name, stride=1):
     padding = (k - 1) // 2

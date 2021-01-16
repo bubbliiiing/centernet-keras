@@ -1,7 +1,8 @@
-import keras
 import math
-import tensorflow as tf
+
+import keras
 import numpy as np
+import tensorflow as tf
 from keras import backend as K
 from PIL import Image
 
@@ -50,20 +51,22 @@ def nms(results, nms):
         #   https://www.bilibili.com/video/BV1Lz411B7nQ
         #------------------------------------------------#
         detections = results[i]
-        unique_class = np.unique(detections[:,-1])
+        unique_class = np.unique(detections[:, -1])
 
         best_box = []
         if len(unique_class) == 0:
             results.append(best_box)
             continue
-        # 对种类进行循环，
-        # 非极大抑制的作用是筛选出一定区域内属于同一种类得分最大的框，
-        # 对种类进行循环可以帮助我们对每一个类分别进行非极大抑制。
+        #-------------------------------------------------------------------#
+        #   对种类进行循环，
+        #   非极大抑制的作用是筛选出一定区域内属于同一种类得分最大的框，
+        #   对种类进行循环可以帮助我们对每一个类分别进行非极大抑制。
+        #-------------------------------------------------------------------#
         for c in unique_class:
             cls_mask = detections[:,-1] == c
 
             detection = detections[cls_mask]
-            scores = detection[:,4]
+            scores = detection[:, 4]
             # 根据得分对该种类进行从大到小排序。
             arg_sort = np.argsort(scores)[::-1]
             detection = detection[arg_sort]
@@ -72,8 +75,8 @@ def nms(results, nms):
                 best_box.append(detection[0])
                 if len(detection) == 1:
                     break
-                ious = iou(best_box[-1],detection[1:])
-                detection = detection[1:][ious<nms]
+                ious = iou(best_box[-1], detection[1:])
+                detection = detection[1:][ious < nms]
         outputs.append(best_box)
     return outputs
 

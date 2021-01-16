@@ -3,20 +3,19 @@
 #-------------------------------------------------------------#
 from __future__ import print_function
 
-import numpy as np
 import keras.backend as K
+import numpy as np
 from keras import layers
-
-from keras.layers import Input
-from keras.layers import Activation,BatchNormalization,Flatten
-from keras.layers import Dense,Conv2D,MaxPooling2D,ZeroPadding2D,AveragePooling2D,Dropout,Conv2DTranspose
+from keras.applications.imagenet_utils import (decode_predictions,
+                                               preprocess_input)
+from keras.layers import (Activation, AveragePooling2D, BatchNormalization,
+                          Conv2D, Conv2DTranspose, Dense, Dropout, Flatten,
+                          Input, MaxPooling2D, ZeroPadding2D)
 from keras.models import Model
-
 from keras.preprocessing import image
 from keras.regularizers import l2
 from keras.utils.data_utils import get_file
-from keras.applications.imagenet_utils import decode_predictions
-from keras.applications.imagenet_utils import preprocess_input
+
 
 
 def identity_block(input_tensor, kernel_size, filters, stage, block):
@@ -141,8 +140,3 @@ def centernet_head(x,num_classes):
     y3 = Activation('relu')(y3)
     y3 = Conv2D(2, 1, kernel_initializer='he_normal', kernel_regularizer=l2(5e-4))(y3)
     return y1, y2, y3
-
-if __name__ == "__main__":
-    inputs = Input(shape=(512, 512, 3))
-    model = ResNet50(inputs)
-    model.summary()

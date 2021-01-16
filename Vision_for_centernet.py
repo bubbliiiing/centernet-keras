@@ -1,5 +1,5 @@
-import numpy as np 
 import matplotlib.pyplot as plt
+import numpy as np
 
 if __name__ == "__main__":
     height, width, feat_stride = 128,128,1

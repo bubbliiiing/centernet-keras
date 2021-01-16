@@ -1,12 +1,14 @@
-from PIL import Image
-from random import shuffle
-from matplotlib.colors import rgb_to_hsv, hsv_to_rgb
-from utils.utils import gaussian_radius, draw_gaussian
-import numpy as np
 import math
+from random import shuffle
+
 import cv2
-import tensorflow as tf
 import keras.backend as K
+import numpy as np
+import tensorflow as tf
+from matplotlib.colors import hsv_to_rgb, rgb_to_hsv
+from PIL import Image
+from utils.utils import draw_gaussian, gaussian_radius
+
 
 def preprocess_image(image):
     mean = [0.40789655, 0.44719303, 0.47026116]
@@ -14,12 +16,21 @@ def preprocess_image(image):
     return ((np.float32(image) / 255.) - mean) / std
     
 def focal_loss(hm_pred, hm_true):
-    # 找到正样本和负样本
+    #-------------------------------------------------------------------------#
+    #   找到每张图片的正样本和负样本
+    #   一个真实框对应一个正样本
+    #   除去正样本的特征点，其余为负样本
+    #-------------------------------------------------------------------------#
     pos_mask = tf.cast(tf.equal(hm_true, 1), tf.float32)
-    # 小于1的都是负样本
     neg_mask = tf.cast(tf.less(hm_true, 1), tf.float32)
+    #-------------------------------------------------------------------------#
+    #   正样本特征点附近的负样本的权值更小一些
+    #-------------------------------------------------------------------------#
     neg_weights = tf.pow(1 - hm_true, 4)
 
+    #-------------------------------------------------------------------------#
+    #   计算focal loss。难分类样本权重大，易分类样本权重小。
+    #-------------------------------------------------------------------------#
     pos_loss = -tf.log(tf.clip_by_value(hm_pred, 1e-6, 1.)) * tf.pow(1 - hm_pred, 2) * pos_mask
     neg_loss = -tf.log(tf.clip_by_value(1 - hm_pred, 1e-6, 1.)) * tf.pow(hm_pred, 2) * neg_weights * neg_mask
 
@@ -27,29 +38,38 @@ def focal_loss(hm_pred, hm_true):
     pos_loss = tf.reduce_sum(pos_loss)
     neg_loss = tf.reduce_sum(neg_loss)
 
+    #-------------------------------------------------------------------------#
+    #   进行损失的归一化
+    #-------------------------------------------------------------------------#
     cls_loss = tf.cond(tf.greater(num_pos, 0), lambda: (pos_loss + neg_loss) / num_pos, lambda: neg_loss)
     return cls_loss
 
 
 def reg_l1_loss(y_pred, y_true, indices, mask):
+    #-------------------------------------------------------------------------#
+    #   获得batch_size和num_classes
+    #-------------------------------------------------------------------------#
     b, c = tf.shape(y_pred)[0], tf.shape(y_pred)[-1]
     k = tf.shape(indices)[1]
 
     y_pred = tf.reshape(y_pred, (b, -1, c))
     length = tf.shape(y_pred)[1]
     indices = tf.cast(indices, tf.int32)
-
-    # 找到其在1维上的索引
+    #-------------------------------------------------------------------------#
+    #   利用序号取出预测结果中，和真实框相同的特征点的部分
+    #-------------------------------------------------------------------------#
     batch_idx = tf.expand_dims(tf.range(0, b), 1)
     batch_idx = tf.tile(batch_idx, (1, k))
     full_indices = (tf.reshape(batch_idx, [-1]) * tf.to_int32(length) +
                     tf.reshape(indices, [-1]))
-    # 取出对应的预测值
-    y_pred = tf.gather(tf.reshape(y_pred, [-1,c]),full_indices)
+
+    y_pred = tf.gather(tf.reshape(y_pred, [-1, c]), full_indices)
     y_pred = tf.reshape(y_pred, [b, -1, c])
 
     mask = tf.tile(tf.expand_dims(mask, axis=-1), (1, 1, 2))
-    # 求取l1损失值
+    #-------------------------------------------------------------------------#
+    #   求取l1损失值
+    #-------------------------------------------------------------------------#
     total_loss = tf.reduce_sum(tf.abs(y_true * mask - y_pred * mask))
     reg_loss = total_loss / (tf.reduce_sum(mask) + 1e-4)
     return reg_loss
@@ -57,14 +77,14 @@ def reg_l1_loss(y_pred, y_true, indices, mask):
 
 def loss(args):
     #-----------------------------------------------------------------------------------------------------------------#
-    # hm_pred：热力图的预测值       (self.batch_size, self.output_size[0], self.output_size[1], self.num_classes)
-    # wh_pred：宽高的预测值         (self.batch_size, self.output_size[0], self.output_size[1], 2)
-    # reg_pred：中心坐标偏移预测值  (self.batch_size, self.output_size[0], self.output_size[1], 2)
-    # hm_true：热力图的真实值       (self.batch_size, self.output_size[0], self.output_size[1], self.num_classes)
-    # wh_true：宽高的真实值         (self.batch_size, self.max_objects, 2)
-    # reg_true：中心坐标偏移真实值  (self.batch_size, self.max_objects, 2)
-    # reg_mask：真实值的mask        (self.batch_size, self.max_objects)
-    # indices：真实值对应的坐标     (self.batch_size, self.max_objects)
+    #   hm_pred：热力图的预测值       (batch_size, 128, 128, num_classes)
+    #   wh_pred：宽高的预测值         (batch_size, 128, 128, 2)
+    #   reg_pred：中心坐标偏移预测值  (batch_size, 128, 128, 2)
+    #   hm_true：热力图的真实值       (batch_size, 128, 128, num_classes)
+    #   wh_true：宽高的真实值         (batch_size, max_objects, 2)
+    #   reg_true：中心坐标偏移真实值  (batch_size, max_objects, 2)
+    #   reg_mask：真实值的mask        (batch_size, max_objects)
+    #   indices：真实值对应的坐标     (batch_size, max_objects)
     #-----------------------------------------------------------------------------------------------------------------#
     hm_pred, wh_pred, reg_pred, hm_true, wh_true, reg_true, reg_mask, indices = args
     hm_loss = focal_loss(hm_pred, hm_true)
@@ -89,13 +109,43 @@ class Generator(object):
         self.num_classes = num_classes
         self.max_objects = max_objects
         
-    def get_random_data(self, annotation_line, input_shape, random=True, jitter=.3, hue=.1, sat=1.5, val=1.5, proc_img=True):
+    def get_random_data(self, annotation_line, input_shape, jitter=.3, hue=.1, sat=1.5, val=1.5, random=True):
         '''r实时数据增强的随机预处理'''
         line = annotation_line.split()
         image = Image.open(line[0])
         iw, ih = image.size
         h, w = input_shape
         box = np.array([np.array(list(map(int,box.split(',')))) for box in line[1:]])
+
+        if not random:
+            # resize image
+            scale = min(w/iw, h/ih)
+            nw = int(iw*scale)
+            nh = int(ih*scale)
+            dx = (w-nw)//2
+            dy = (h-nh)//2
+
+            image = image.resize((nw,nh), Image.BICUBIC)
+            new_image = Image.new('RGB', (w,h), (128,128,128))
+            new_image.paste(image, (dx, dy))
+            image_data = np.array(new_image, np.float32)
+
+            # correct boxes
+            box_data = np.zeros((len(box),5))
+            if len(box)>0:
+                np.random.shuffle(box)
+                box[:, [0,2]] = box[:, [0,2]]*nw/iw + dx
+                box[:, [1,3]] = box[:, [1,3]]*nh/ih + dy
+                box[:, 0:2][box[:, 0:2]<0] = 0
+                box[:, 2][box[:, 2]>w] = w
+                box[:, 3][box[:, 3]>h] = h
+                box_w = box[:, 2] - box[:, 0]
+                box_h = box[:, 3] - box[:, 1]
+                box = box[np.logical_and(box_w>1, box_h>1)]
+                box_data = np.zeros((len(box),5))
+                box_data[:len(box)] = box
+
+            return image_data, box_data
 
         # resize image
         new_ar = w/h * rand(1-jitter,1+jitter)/rand(1-jitter,1+jitter)
@@ -134,7 +184,6 @@ class Generator(object):
         x[x<0] = 0
         image_data = cv2.cvtColor(x, cv2.COLOR_HSV2RGB)*255
 
-
         # correct boxes
         box_data = np.zeros((len(box),5))
         if len(box)>0:
@@ -150,13 +199,8 @@ class Generator(object):
             box = box[np.logical_and(box_w>1, box_h>1)] # discard invalid box
             box_data = np.zeros((len(box),5))
             box_data[:len(box)] = box
-        if len(box) == 0:
-            return image_data, []
 
-        if (box_data[:,:4]>0).any():
-            return image_data, box_data
-        else:
-            return image_data, []
+        return image_data, box_data
 
     def generate(self, train=True):
         while True:
@@ -177,7 +221,7 @@ class Generator(object):
             
             b = 0
             for annotation_line in lines:  
-                img,y=self.get_random_data(annotation_line,self.input_size[0:2])
+                img,y = self.get_random_data(annotation_line,self.input_size[0:2],random=train)
 
                 if len(y)!=0:
                     boxes = np.array(y[:,:4],dtype=np.float32)
