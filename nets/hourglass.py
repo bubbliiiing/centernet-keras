@@ -1,5 +1,6 @@
 import keras.backend as K
 import numpy as np
+from keras.initializers import random_normal
 from keras.layers import (Activation, Add, BatchNormalization, Concatenate,
                           Conv2D, Input, UpSampling2D, ZeroPadding2D)
 from keras.models import Model
@@ -10,7 +11,7 @@ from keras.utils import get_file
 def conv2d(x, k, out_dim, name, stride=1):
     padding = (k - 1) // 2
     x = ZeroPadding2D(padding=padding, name=name + '.pad')(x)
-    x = Conv2D(out_dim, k, strides=stride, use_bias=False, name=name + '.conv')(x)
+    x = Conv2D(out_dim, k, strides=stride, kernel_initializer=random_normal(stddev=0.02), use_bias=False, name=name + '.conv')(x)
     x = BatchNormalization(epsilon=1e-5, name=name + '.bn')(x)
     x = Activation('relu', name=name + '.relu')(x)
     return x
@@ -26,15 +27,15 @@ def residual(x, out_dim, name, stride=1):
     num_channels = K.int_shape(shortcut)[-1]
 
     x = ZeroPadding2D(padding=1, name=name + '.pad1')(x)
-    x = Conv2D(out_dim, 3, strides=stride, use_bias=False, name=name + '.conv1')(x)
+    x = Conv2D(out_dim, 3, strides=stride, kernel_initializer=random_normal(stddev=0.02), use_bias=False, name=name + '.conv1')(x)
     x = BatchNormalization(epsilon=1e-5, name=name + '.bn1')(x)
     x = Activation('relu', name=name + '.relu1')(x)
 
-    x = Conv2D(out_dim, 3, padding='same', use_bias=False, name=name + '.conv2')(x)
+    x = Conv2D(out_dim, 3, padding='same', kernel_initializer=random_normal(stddev=0.02), use_bias=False, name=name + '.conv2')(x)
     x = BatchNormalization(epsilon=1e-5, name=name + '.bn2')(x)
 
     if num_channels != out_dim or stride != 1:
-        shortcut = Conv2D(out_dim, 1, strides=stride, use_bias=False, name=name + '.shortcut.0')(
+        shortcut = Conv2D(out_dim, 1, strides=stride, kernel_initializer=random_normal(stddev=0.02), use_bias=False, name=name + '.shortcut.0')(
             shortcut)
         shortcut = BatchNormalization(epsilon=1e-5, name=name + '.shortcut.1')(shortcut)
 
@@ -104,17 +105,17 @@ def right_features(leftfeatures, hgid, dims):
 
 
 def create_heads(num_classes, rf1, hgid):
-    y1 = Conv2D(256, 3, use_bias=True, padding='same', name='hm.%d.0.conv' % hgid)(rf1)
+    y1 = Conv2D(256, 3, use_bias=True, kernel_initializer=random_normal(stddev=0.02), padding='same', name='hm.%d.0.conv' % hgid)(rf1)
     y1 = Activation('relu', name='hm.%d.0.relu' % hgid)(y1)
     y1 = Conv2D(num_classes, 1, use_bias=True, name='hm.%d.1' % hgid, activation = "sigmoid")(y1)
 
-    y2 = Conv2D(256, 3, use_bias=True, padding='same', name='wh.%d.0.conv' % hgid)(rf1)
+    y2 = Conv2D(256, 3, use_bias=True, kernel_initializer=random_normal(stddev=0.02), padding='same', name='wh.%d.0.conv' % hgid)(rf1)
     y2 = Activation('relu', name='wh.%d.0.relu' % hgid)(y2)
     y2 = Conv2D(2, 1, use_bias=True, name='wh.%d.1' % hgid)(y2)
 
-    y3 = Conv2D(256, 3, use_bias=True, padding='same', name='reg.%d.0.conv' % hgid)(rf1)
+    y3 = Conv2D(256, 3, use_bias=True, kernel_initializer=random_normal(stddev=0.02), padding='same', name='reg.%d.0.conv' % hgid)(rf1)
     y3 = Activation('relu', name='reg.%d.0.relu' % hgid)(y3)
-    y3 = Conv2D(2, 1, use_bias=True, name='reg.%d.1' % hgid)(y3)
+    y3 = Conv2D(2, 1, use_bias=True, kernel_initializer=random_normal(stddev=0.02), name='reg.%d.1' % hgid)(y3)
 
     return [y1,y2,y3]
 
@@ -138,10 +139,10 @@ def HourglassNetwork(inpnuts, num_stacks, num_classes, cnv_dim=256, dims=[256, 3
         _heads, inter = hourglass_module(num_classes, inter, cnv_dim, i, dims)
         outputs.append(_heads)
         if i < num_stacks - 1:
-            inter_ = Conv2D(cnv_dim, 1, use_bias=False, name='inter_.%d.0' % i)(prev_inter)
+            inter_ = Conv2D(cnv_dim, 1, use_bias=False, kernel_initializer=random_normal(stddev=0.02), name='inter_.%d.0' % i)(prev_inter)
             inter_ = BatchNormalization(epsilon=1e-5, name='inter_.%d.1' % i)(inter_)
 
-            cnv_ = Conv2D(cnv_dim, 1, use_bias=False, name='cnv_.%d.0' % i)(inter)
+            cnv_ = Conv2D(cnv_dim, 1, use_bias=False, kernel_initializer=random_normal(stddev=0.02), name='cnv_.%d.0' % i)(inter)
             cnv_ = BatchNormalization(epsilon=1e-5, name='cnv_.%d.1' % i)(cnv_)
 
             inter = Add(name='inters.%d.inters.add' % i)([inter_, cnv_])
