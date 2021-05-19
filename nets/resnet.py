@@ -3,19 +3,11 @@
 #-------------------------------------------------------------#
 from __future__ import print_function
 
-import keras.backend as K
-import numpy as np
 from keras import layers
-from keras.applications.imagenet_utils import (decode_predictions,
-                                               preprocess_input)
-from keras.layers import (Activation, AveragePooling2D, BatchNormalization,
-                          Conv2D, Conv2DTranspose, Dense, Dropout, Flatten,
-                          Input, MaxPooling2D, ZeroPadding2D)
-from keras.models import Model
-from keras.preprocessing import image
+from keras.layers import (Activation, BatchNormalization, Conv2D,
+                          Conv2DTranspose, Dropout, MaxPooling2D,
+                          ZeroPadding2D)
 from keras.regularizers import l2
-from keras.utils.data_utils import get_file
-
 
 
 def identity_block(input_tensor, kernel_size, filters, stage, block):

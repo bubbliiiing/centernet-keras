@@ -1,13 +1,8 @@
-import keras.backend as K
 import tensorflow as tf
-from keras.initializers import constant, normal, zeros
-from keras.layers import (Activation, BatchNormalization, Conv2D,
-                          Conv2DTranspose, Dropout, Input, Lambda,
-                          MaxPooling2D, Reshape, ZeroPadding2D)
+from keras.layers import Input, Lambda, MaxPooling2D
 from keras.models import Model
-from keras.regularizers import l2
 
-from nets.center_training import loss
+from nets.centernet_training import loss
 from nets.hourglass import HourglassNetwork
 from nets.resnet import ResNet50, centernet_head
 
@@ -45,7 +40,7 @@ def topk(hm, max_objects=100):
     indices = ys * w + xs
     return scores, indices, class_ids, xs, ys
 
-def decode(hm, wh, reg, max_objects=100,num_classes=20):
+def decode(hm, wh, reg, max_objects=100):
     #-----------------------------------------------------#
     #   hm          b, 128, 128, num_classes 
     #   wh          b, 128, 128, 2 
@@ -63,25 +58,25 @@ def decode(hm, wh, reg, max_objects=100,num_classes=20):
     #   wh          b, 128 * 128, 2
     #   reg         b, 128 * 128, 2
     #-----------------------------------------------------#
-    reg = tf.reshape(reg, [b, -1, 2])
-    wh = tf.reshape(wh, [b, -1, 2])
-    length = tf.shape(wh)[1]
+    reg     = tf.reshape(reg, [b, -1, 2])
+    wh      = tf.reshape(wh, [b, -1, 2])
+    length  = tf.shape(wh)[1]
 
     #-----------------------------------------------------#
     #   找到其在1维上的索引
     #   batch_idx   b, max_objects
     #-----------------------------------------------------#
-    batch_idx = tf.expand_dims(tf.range(0, b), 1)
-    batch_idx = tf.tile(batch_idx, (1, max_objects))
-    full_indices = tf.reshape(batch_idx, [-1]) * tf.to_int32(length) + tf.reshape(indices, [-1])
+    batch_idx       = tf.expand_dims(tf.range(0, b), 1)
+    batch_idx       = tf.tile(batch_idx, (1, max_objects))
+    full_indices    = tf.reshape(batch_idx, [-1]) * tf.to_int32(length) + tf.reshape(indices, [-1])
                     
     #-----------------------------------------------------#
     #   取出top_k个框对应的参数
     #-----------------------------------------------------#
-    topk_reg = tf.gather(tf.reshape(reg, [-1,2]), full_indices)
+    topk_reg = tf.gather(tf.reshape(reg, [-1, 2]), full_indices)
     topk_reg = tf.reshape(topk_reg, [b, -1, 2])
     
-    topk_wh = tf.gather(tf.reshape(wh, [-1,2]), full_indices)
+    topk_wh = tf.gather(tf.reshape(wh, [-1, 2]), full_indices)
     topk_wh = tf.reshape(topk_wh, [b, -1, 2])
 
     #-----------------------------------------------------#
@@ -106,8 +101,8 @@ def decode(hm, wh, reg, max_objects=100,num_classes=20):
     #   scores      b,k,1       预测框得分
     #   class_ids   b,k,1       预测框种类
     #-----------------------------------------------------#
-    scores = tf.expand_dims(scores, axis=-1)
-    class_ids = tf.cast(tf.expand_dims(class_ids, axis=-1), tf.float32)
+    scores      = tf.expand_dims(scores, axis=-1)
+    class_ids   = tf.cast(tf.expand_dims(class_ids, axis=-1), tf.float32)
     
     #-----------------------------------------------------#
     #   detections  预测框所有参数的堆叠
@@ -117,16 +112,15 @@ def decode(hm, wh, reg, max_objects=100,num_classes=20):
 
     return detections
 
-
 def centernet(input_shape, num_classes, backbone='resnet50', max_objects=100, mode="train", num_stacks=2):
     assert backbone in ['resnet50', 'hourglass']
-    output_size = input_shape[0] // 4
-    image_input = Input(shape=input_shape)
-    hm_input = Input(shape=(output_size, output_size, num_classes))
-    wh_input = Input(shape=(max_objects, 2))
-    reg_input = Input(shape=(max_objects, 2))
-    reg_mask_input = Input(shape=(max_objects,))
-    index_input = Input(shape=(max_objects,))
+    output_size     = input_shape[0] // 4
+    image_input     = Input(shape=input_shape)
+    hm_input        = Input(shape=(output_size, output_size, num_classes))
+    wh_input        = Input(shape=(max_objects, 2))
+    reg_input       = Input(shape=(max_objects, 2))
+    reg_mask_input  = Input(shape=(max_objects,))
+    index_input     = Input(shape=(max_objects,))
 
     if backbone=='resnet50':
         #-----------------------------------#
@@ -147,8 +141,7 @@ def centernet(input_shape, num_classes, backbone='resnet50', max_objects=100, mo
             model = Model(inputs=[image_input, hm_input, wh_input, reg_input, reg_mask_input, index_input], outputs=[loss_])
             return model
         else:
-            detections = Lambda(lambda x: decode(*x, max_objects=max_objects,
-                                                num_classes=num_classes))([y1, y2, y3])
+            detections = Lambda(lambda x: decode(*x, max_objects=max_objects))([y1, y2, y3])
             prediction_model = Model(inputs=image_input, outputs=detections)
             return prediction_model
 
@@ -167,7 +160,6 @@ def centernet(input_shape, num_classes, backbone='resnet50', max_objects=100, mo
             return model
         else:
             y1, y2, y3 = outs[-1]
-            detections = Lambda(lambda x: decode(*x, max_objects=max_objects,
-                                                num_classes=num_classes))([y1, y2, y3])
+            detections = Lambda(lambda x: decode(*x, max_objects=max_objects))([y1, y2, y3])
             prediction_model = Model(inputs=image_input, outputs=[detections])
             return prediction_model
