@@ -113,6 +113,13 @@ def decode(hm, wh, reg, max_objects=100):
     return detections
 
 def centernet(input_shape, num_classes, backbone='resnet50', max_objects=100, mode="train", num_stacks=2):
+    import tensorflow as tf
+    import keras.backend.tensorflow_backend as KTF
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth=True   #不全部占满显存, 按需分配
+    sess = tf.Session(config=config)
+    KTF.set_session(sess)
+    
     assert backbone in ['resnet50', 'hourglass']
     output_size     = input_shape[0] // 4
     image_input     = Input(shape=input_shape)
@@ -154,7 +161,7 @@ def centernet(input_shape, num_classes, backbone='resnet50', max_objects=100, mo
                 y1, y2, y3 = out
                 loss_ = Lambda(loss)([y1, y2, y3, hm_input, wh_input, reg_input, reg_mask_input, index_input])
                 loss_all.append(loss_)
-            loss_all = Lambda(tf.reduce_mean,name='centernet_loss')(loss_all)
+            loss_all = Lambda(tf.reduce_mean, name='centernet_loss')(loss_all)
 
             model = Model(inputs=[image_input, hm_input, wh_input, reg_input, reg_mask_input, index_input], outputs=loss_all)
             return model
