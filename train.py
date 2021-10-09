@@ -77,7 +77,7 @@ if __name__ == "__main__":
     val_annotation_path     = '2007_val.txt'
 
     #----------------------------------------------------#
-    #   获取classes和anchor
+    #   获取classes
     #----------------------------------------------------#
     class_names, num_classes = get_classes(classes_path)
 
