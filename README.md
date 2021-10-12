@@ -1,6 +1,9 @@
 ## CenterNet:Objects as Points目标检测模型在Keras当中的实现
 ---
 
+**2021年10月12日更新：**   
+**进行了大幅度的更新，对代码的模块进行修改，加了大量注释。**   
+
 ## 目录
 1. [性能情况 Performance](#性能情况)
 2. [所需环境 Environment](#所需环境)
@@ -28,7 +31,7 @@ keras==2.1.5
 **在训练前需要务必在model_data下新建一个txt文档，文档中输入需要分的类，在train.py中将classes_path指向该文件**。     
 
 ## 文件下载 
-训练所需的centernet_resnet50_voc.h5、centernet_hourglass_coco.h5可在百度网盘中下载。    
+训练所需的centernet_resnet50_voc.h5、centernet_hourglass_coco.h5和主干的权值可在百度网盘中下载。    
 链接: https://pan.baidu.com/s/16THB8R0k42-PInATKStvug    
 提取码: 1iqp      
 
