@@ -70,8 +70,11 @@ class CenterNet(object):
     #---------------------------------------------------#
     def __init__(self, **kwargs):
         self.__dict__.update(self._defaults)
+        self.heatmap = False
         for name, value in kwargs.items():
             setattr(self, name, value)
+            if name == "heatmap" and value == True:
+                self.heatmap = True
         #---------------------------------------------------#
         #   计算总的类的数量
         #---------------------------------------------------#
@@ -97,14 +100,14 @@ class CenterNet(object):
         #----------------------------------------#
         #   创建centernet模型
         #----------------------------------------#
-        self.centernet = centernet([self.input_shape[0], self.input_shape[1], 3], num_classes=self.num_classes, backbone=self.backbone, mode='predict')
+        self.centernet = centernet([self.input_shape[0], self.input_shape[1], 3], num_classes=self.num_classes, backbone=self.backbone, mode='predict' if not self.heatmap else 'heatmap')
         self.centernet.load_weights(self.model_path, by_name=True)
         print('{} model, anchors, and classes loaded.'.format(self.model_path))
 
     #---------------------------------------------------#
     #   检测图片
     #---------------------------------------------------#
-    def detect_image(self, image, crop = False):
+    def detect_image(self, image, crop = False, count = False):
         #---------------------------------------------------#
         #   获得输入图片的高和宽
         #---------------------------------------------------#
@@ -149,7 +152,18 @@ class CenterNet(object):
         #---------------------------------------------------------#
         font = ImageFont.truetype(font='model_data/simhei.ttf', size=np.floor(3e-2 * np.shape(image)[1] + 0.5).astype('int32'))
         thickness = max((np.shape(image)[0] + np.shape(image)[1]) // self.input_shape[0], 1)
-
+        #---------------------------------------------------------#
+        #   计数
+        #---------------------------------------------------------#
+        if count:
+            print("top_label:", top_label)
+            classes_nums    = np.zeros([self.num_classes])
+            for i in range(self.num_classes):
+                num = np.sum(top_label == i)
+                if num > 0:
+                    print(self.class_names[i], " : ", num)
+                classes_nums[i] = num
+            print("classes_nums:", classes_nums)
         #---------------------------------------------------------#
         #   是否进行目标的裁剪
         #---------------------------------------------------------#
@@ -247,6 +261,43 @@ class CenterNet(object):
         tact_time = (t2 - t1) / test_interval
         return tact_time
 
+    def detect_heatmap(self, image, heatmap_save_path):
+        import cv2
+        import matplotlib.pyplot as plt
+        #---------------------------------------------------------#
+        #   在这里将图像转换成RGB图像，防止灰度图在预测时报错。
+        #   代码仅仅支持RGB图像的预测，所有其它类型的图像都会转化成RGB
+        #---------------------------------------------------------#
+        image       = cvtColor(image)
+        #---------------------------------------------------------#
+        #   给图像增加灰条，实现不失真的resize
+        #   也可以直接resize进行识别
+        #---------------------------------------------------------#
+        image_data  = resize_image(image, (self.input_shape[1], self.input_shape[0]), self.letterbox_image)
+        #---------------------------------------------------------#
+        #   添加上batch_size维度，并进行归一化
+        #---------------------------------------------------------#
+        image_data  = np.expand_dims(preprocess_input(np.array(image_data, dtype='float32')), 0)
+        
+        output  = self.centernet.predict(image_data)
+        
+        plt.imshow(image, alpha=1)
+        plt.axis('off')
+        mask        = np.zeros((image.size[1], image.size[0]))
+        score       = np.max(output[0], -1)
+        score       = cv2.resize(score, (image.size[1], image.size[0]))
+        normed_score    = (score * 255).astype('uint8')
+        mask            = np.maximum(mask, normed_score)
+            
+        plt.imshow(mask, alpha=0.5, interpolation='nearest', cmap="jet")
+
+        plt.axis('off')
+        plt.subplots_adjust(top=1, bottom=0, right=1,  left=0, hspace=0, wspace=0)
+        plt.margins(0, 0)
+        plt.savefig(heatmap_save_path, dpi=200, bbox_inches='tight', pad_inches = -0.1)
+        print("Save to the " + heatmap_save_path)
+        plt.show()
+        
     def get_map_txt(self, image_id, image, class_names, map_out_path):
         f = open(os.path.join(map_out_path, "detection-results/"+image_id+".txt"),"w") 
         #---------------------------------------------------#
