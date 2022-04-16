@@ -9,13 +9,16 @@ from keras.optimizers import SGD, Adam
 from keras.regularizers import l2
 from keras.utils.multi_gpu_utils import multi_gpu_model
 
-from nets.centernet import centernet
+from nets.centernet import centernet, get_train_model
 from nets.centernet_training import get_lr_scheduler
 from utils.callbacks import (ExponentDecayScheduler, LossHistory,
                              ParallelModelCheckpoint)
 from utils.dataloader import CenternetDatasets
 from utils.utils import get_classes
 
+import tensorflow as tf
+gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.7)
+sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) 
 '''
 训练自己的目标检测模型一定需要注意以下几点：
 1、训练前仔细检查自己的格式是否满足要求，该库要求数据集格式为VOC格式，需要准备好的内容有输入图片和标签
@@ -205,9 +208,10 @@ if __name__ == "__main__":
         model_body.load_weights(model_path, by_name=True, skip_mismatch=True)
 
     if ngpus_per_node > 1:
-        model = multi_gpu_model(model_body, gpus=ngpus_per_node)
+        model   = multi_gpu_model(model_body, gpus=ngpus_per_node)
+        model   = get_train_model(model, input_shape, num_classes, backbone)
     else:
-        model = model_body
+        model   = get_train_model(model_body, input_shape, num_classes, backbone)
 
     #---------------------------#
     #   读取数据集对应的txt

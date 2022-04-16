@@ -114,13 +114,7 @@ def decode(hm, wh, reg, max_objects=100):
 
 def centernet(input_shape, num_classes, backbone='resnet50', max_objects=100, mode="train", num_stacks=2):
     assert backbone in ['resnet50', 'hourglass']
-    output_size     = input_shape[0] // 4
     image_input     = Input(shape=input_shape)
-    hm_input        = Input(shape=(output_size, output_size, num_classes))
-    wh_input        = Input(shape=(max_objects, 2))
-    reg_input       = Input(shape=(max_objects, 2))
-    reg_mask_input  = Input(shape=(max_objects,))
-    index_input     = Input(shape=(max_objects,))
 
     if backbone=='resnet50':
         #-----------------------------------#
@@ -137,8 +131,7 @@ def centernet(input_shape, num_classes, backbone='resnet50', max_objects=100, mo
         y1, y2, y3 = centernet_head(C5, num_classes)
 
         if mode=="train":
-            loss_ = Lambda(loss, name='centernet_loss')([y1, y2, y3, hm_input, wh_input, reg_input, reg_mask_input, index_input])
-            model = Model(inputs=[image_input, hm_input, wh_input, reg_input, reg_mask_input, index_input], outputs=[loss_])
+            model = Model(inputs=image_input, outputs=[y1, y2, y3])
             return model
         elif mode=="predict":
             detections = Lambda(lambda x: decode(*x, max_objects=max_objects))([y1, y2, y3])
@@ -152,14 +145,10 @@ def centernet(input_shape, num_classes, backbone='resnet50', max_objects=100, mo
         outs = HourglassNetwork(image_input,num_stacks,num_classes)
 
         if mode=="train":
-            loss_all = []
-            for out in outs:  
-                y1, y2, y3 = out
-                loss_ = Lambda(loss)([y1, y2, y3, hm_input, wh_input, reg_input, reg_mask_input, index_input])
-                loss_all.append(loss_)
-            loss_all = Lambda(tf.reduce_mean, name='centernet_loss')(loss_all)
-
-            model = Model(inputs=[image_input, hm_input, wh_input, reg_input, reg_mask_input, index_input], outputs=loss_all)
+            temp_outs = []
+            for out in outs:
+                temp_outs += out
+            model = Model(inputs=image_input, outputs=out)
             return model
         elif mode=="predict":
             y1, y2, y3 = outs[-1]
@@ -170,3 +159,31 @@ def centernet(input_shape, num_classes, backbone='resnet50', max_objects=100, mo
             y1, y2, y3 = outs[-1]
             prediction_model = Model(inputs=image_input, outputs=y1)
             return prediction_model
+
+def get_train_model(model_body, input_shape, num_classes, backbone='resnet50', max_objects=100):
+    output_size     = input_shape[0] // 4
+    hm_input        = Input(shape=(output_size, output_size, num_classes))
+    wh_input        = Input(shape=(max_objects, 2))
+    reg_input       = Input(shape=(max_objects, 2))
+    reg_mask_input  = Input(shape=(max_objects,))
+    index_input     = Input(shape=(max_objects,))
+
+    if backbone=='resnet50':
+        y1, y2, y3 = model_body.output
+
+        loss_ = Lambda(loss, output_shape = (1, ),name='centernet_loss')([y1, y2, y3, hm_input, wh_input, reg_input, reg_mask_input, index_input])
+
+        model = Model(inputs=[model_body.input, hm_input, wh_input, reg_input, reg_mask_input, index_input], outputs=[loss_])
+    else:
+        outs = model_body.output
+
+        loss_all = []
+        for i in range(len(outs) // 3):  
+            y1, y2, y3 = outs[0 + i * 3], outs[1 + i * 3], outs[2 + i * 3]
+            loss_ = Lambda(loss)([y1, y2, y3, hm_input, wh_input, reg_input, reg_mask_input, index_input])
+            loss_all.append(loss_)
+        loss_all =   Lambda(tf.reduce_mean, output_shape = (1, ),name='centernet_loss')(loss_)
+
+        model       = Model(inputs=[model_body.input, hm_input, wh_input, reg_input, reg_mask_input, index_input], outputs=[loss_all])
+        
+    return model
