@@ -16,9 +16,7 @@ from utils.callbacks import (ExponentDecayScheduler, LossHistory,
 from utils.dataloader import CenternetDatasets
 from utils.utils import get_classes
 
-import tensorflow as tf
-gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.7)
-sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) 
+
 '''
 训练自己的目标检测模型一定需要注意以下几点：
 1、训练前仔细检查自己的格式是否满足要求，该库要求数据集格式为VOC格式，需要准备好的内容有输入图片和标签
