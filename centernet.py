@@ -7,7 +7,7 @@ from keras import backend as K
 from PIL import ImageDraw, ImageFont
 
 from nets.centernet import centernet
-from utils.utils import cvtColor, preprocess_input, resize_image, get_classes
+from utils.utils import cvtColor, preprocess_input, resize_image, get_classes, show_config
 from utils.utils_bbox import BBoxUtility
 
 #--------------------------------------------#
@@ -70,6 +70,7 @@ class CenterNet(object):
     #---------------------------------------------------#
     def __init__(self, **kwargs):
         self.__dict__.update(self._defaults)
+        show_config(**self._defaults)
         self.heatmap = False
         for name, value in kwargs.items():
             setattr(self, name, value)
