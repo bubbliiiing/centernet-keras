@@ -131,14 +131,22 @@ def centernet(input_shape, num_classes, backbone='resnet50', max_objects=100, mo
         y1, y2, y3 = centernet_head(C5, num_classes)
 
         if mode=="train":
-            model = Model(inputs=image_input, outputs=[y1, y2, y3])
-            return model
+            #-----------------------------------#
+            #   获得训练用的训练模型
+            #-----------------------------------#
+            model               = Model(inputs=image_input, outputs=[y1, y2, y3])
+            #-----------------------------------#
+            #   prediction_model用于训练时评估
+            #-----------------------------------#
+            detections          = Lambda(lambda x: decode(*x, max_objects=max_objects))([y1, y2, y3])
+            prediction_model    = Model(inputs=image_input, outputs=detections)
+            return model, prediction_model
         elif mode=="predict":
-            detections = Lambda(lambda x: decode(*x, max_objects=max_objects))([y1, y2, y3])
-            prediction_model = Model(inputs=image_input, outputs=detections)
+            detections          = Lambda(lambda x: decode(*x, max_objects=max_objects))([y1, y2, y3])
+            prediction_model    = Model(inputs=image_input, outputs=detections)
             return prediction_model
         elif mode=="heatmap":
-            prediction_model = Model(inputs=image_input, outputs=y1)
+            prediction_model    = Model(inputs=image_input, outputs=y1)
             return prediction_model
 
     else:
@@ -148,16 +156,25 @@ def centernet(input_shape, num_classes, backbone='resnet50', max_objects=100, mo
             temp_outs = []
             for out in outs:
                 temp_outs += out
-            model = Model(inputs=image_input, outputs=out)
-            return model
+            #-----------------------------------#
+            #   获得训练用的训练模型
+            #-----------------------------------#
+            model               = Model(inputs=image_input, outputs=temp_outs)
+            #-----------------------------------#
+            #   prediction_model用于训练时评估
+            #-----------------------------------#
+            y1, y2, y3          = outs[-1]
+            detections          = Lambda(lambda x: decode(*x, max_objects=max_objects))([y1, y2, y3])
+            prediction_model    = Model(inputs=image_input, outputs=[detections])
+            return model, prediction_model
         elif mode=="predict":
-            y1, y2, y3 = outs[-1]
-            detections = Lambda(lambda x: decode(*x, max_objects=max_objects))([y1, y2, y3])
-            prediction_model = Model(inputs=image_input, outputs=[detections])
+            y1, y2, y3          = outs[-1]
+            detections          = Lambda(lambda x: decode(*x, max_objects=max_objects))([y1, y2, y3])
+            prediction_model    = Model(inputs=image_input, outputs=[detections])
             return prediction_model
         elif mode=="heatmap":
-            y1, y2, y3 = outs[-1]
-            prediction_model = Model(inputs=image_input, outputs=y1)
+            y1, y2, y3          = outs[-1]
+            prediction_model    = Model(inputs=image_input, outputs=y1)
             return prediction_model
 
 def get_train_model(model_body, input_shape, num_classes, backbone='resnet50', max_objects=100):
