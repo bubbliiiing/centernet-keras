@@ -8,7 +8,7 @@ if __name__ == "__main__":
     input_shape     = [512, 512]
     num_classes     = 20
     
-    model = centernet([input_shape[0], input_shape[1], 3], num_classes, backbone='resnet50')
+    model, _ = centernet([input_shape[0], input_shape[1], 3], num_classes, backbone='resnet50')
     #--------------------------------------------#
     #   查看网络结构网络结构
     #--------------------------------------------#
